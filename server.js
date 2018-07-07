@@ -34,14 +34,7 @@ app.get('/setup', (req, res) => {
         res.json({ success: true });
     });
 });
-apiRoutes.get('/users', (req, res) => {
-    User.find({}, (err, users) => {
-        if (err) {
-            throw err;
-        }
-        res.json(users);
-    });
-});
+
 apiRoutes.post('/authenticate', (req, res) => {
     User.findOne({
         name: req.body.name,
@@ -64,9 +57,7 @@ apiRoutes.post('/authenticate', (req, res) => {
                 const payload = {
                     admin: user.admin,
                 };
-                const token = jwt.sign(payload, app.get('superSecret'), {
-                    expiresInMinutes: 1440,
-                });
+                const token = jwt.sign(payload, app.get('superSecret'), { expiresIn: 60 * 60 });
                 // Send token in response
                 res.json({
                     success: true,
@@ -75,6 +66,37 @@ apiRoutes.post('/authenticate', (req, res) => {
                 });
             }
         }
+    });
+});
+
+apiRoutes.use((req, res, next) => {
+    const token = req.body.token || req.query.token || req.headers['x-access-token'];
+    // decode token
+    if (token) {
+        // verify if token is a valid one
+        jwt.verify(token, app.get('superSecret'), (err, decoded) => {
+            if (err) {
+                return res.json({ success: false, message: 'Failed to authenticate token.' });
+            }
+            req.decoded = decoded;
+            next();
+            return 0;
+        });
+    } else {
+        return res.status(403).send({
+            success: false,
+            message: 'No token provided',
+        });
+    }
+    return 0;
+});
+
+apiRoutes.get('/users', (req, res) => {
+    User.find({}, (err, users) => {
+        if (err) {
+            throw err;
+        }
+        res.json(users);
     });
 });
 
